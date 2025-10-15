@@ -31,17 +31,42 @@ const isNavigationRequest = (req) => {
   return req.mode === 'navigate' || (req.method === 'GET' && (req.headers.get('accept') || '').includes('text/html'));
 };
 
+// Helper to safely clone response
+const safeCloneResponse = (response) => {
+  if (!response || response.bodyUsed) {
+    return null;
+  }
+  
+  try {
+    return response.clone();
+  } catch (error) {
+    console.warn('Cannot clone response:', error);
+    return null;
+  }
+};
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET') return; // ignore non-GET
+  
+  // Ignore non-GET requests and API calls
+  if (req.method !== 'GET') return;
+  
+  // Skip caching for API requests
+  if (req.url.includes('/api/')) {
+    event.respondWith(fetch(req));
+    return;
+  }
 
   // For navigation (HTML) use network-first so users get latest index.html
   if (isNavigationRequest(req)) {
     event.respondWith(
       fetch(req)
         .then((networkResp) => {
-          // update cache and return
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, networkResp.clone()));
+          // Safely update cache
+          const clonedResponse = safeCloneResponse(networkResp);
+          if (clonedResponse) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, clonedResponse));
+          }
           return networkResp;
         })
         .catch(() => caches.match(req).then((cached) => cached || caches.match('/')))
@@ -52,16 +77,40 @@ self.addEventListener('fetch', (event) => {
   // For other assets: try cache first, then network. If served from cache, update in background.
   event.respondWith(
     caches.match(req).then((cachedResp) => {
-      const networkFetch = fetch(req).then((networkResp) => {
-        // cache successful responses
-        if (networkResp && networkResp.ok) {
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, networkResp.clone()));
-        }
-        return networkResp;
-      }).catch(() => null);
+      // Return cached response if available
+      if (cachedResp) {
+        // Background update from network
+        fetch(req)
+          .then((networkResp) => {
+            if (networkResp && networkResp.ok) {
+              const clonedResponse = safeCloneResponse(networkResp);
+              if (clonedResponse) {
+                caches.open(CACHE_NAME).then((cache) => cache.put(req, clonedResponse));
+              }
+            }
+          })
+          .catch(() => {}); // Ignore network errors for background update
+        return cachedResp;
+      }
 
-      // return cached if available, else wait for network
-      return cachedResp || networkFetch;
+      // No cache found, fetch from network
+      return fetch(req)
+        .then((networkResp) => {
+          if (networkResp && networkResp.ok) {
+            const clonedResponse = safeCloneResponse(networkResp);
+            if (clonedResponse) {
+              caches.open(CACHE_NAME).then((cache) => cache.put(req, clonedResponse));
+            }
+          }
+          return networkResp;
+        })
+        .catch(() => {
+          // Network failed and no cache available
+          return new Response('Network error', {
+            status: 408,
+            statusText: 'Network error'
+          });
+        });
     })
   );
 });
