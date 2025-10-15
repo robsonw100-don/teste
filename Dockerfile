@@ -12,6 +12,18 @@ RUN npm ci
 # Copiar código fonte
 COPY . .
 
+# Definir variáveis de ambiente para o build
+ARG VITE_API_URL
+ARG VITE_WS_URL
+ARG VITE_GOOGLE_MAPS_API_KEY
+ARG VITE_RESTAURANT_ADDRESS
+
+# Exportar como variáveis de ambiente
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
+ENV VITE_RESTAURANT_ADDRESS=$VITE_RESTAURANT_ADDRESS
+
 # Build do frontend
 RUN npm run build
 
@@ -31,12 +43,3 @@ EXPOSE 80
 
 # Comando para iniciar
 CMD ["serve", "-s", "dist", "-l", "80"]
-```
-
-**2. Adicione também um `.dockerignore`:**
-```
-node_modules
-.git
-.env
-dist
-*.log
