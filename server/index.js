@@ -698,7 +698,7 @@ app.post('/criar-pagamento', createPaymentHandler);
 app.post('/api/criar-pagamento', createPaymentHandler);
 
 const port = process.env.PORT || 3000
-const host = process.env.HOST || '::' // listen on IPv6 any (will accept IPv4 on dual-stack systems)
+const host = process.env.HOST || '0.0.0.0' // listen on IPv6 any (will accept IPv4 on dual-stack systems)
 
 // Create HTTP server so we can attach WebSocket server to the same listener
 import http from 'http';
