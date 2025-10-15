@@ -12,7 +12,8 @@ RUN npm ci --only=production
 COPY . .
 
 # Expor porta
-EXPOSE 80
+EXPOSE 3000
 
 # Comando para iniciar
+
 CMD ["node", "index.js"]
